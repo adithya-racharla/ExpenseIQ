@@ -8,7 +8,8 @@ import os
 app = Flask(__name__)
 app.secret_key = "expense_tracker_secret_key"
 
-DB_PATH = "expenses.db"
+import os
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "expenses.db")
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
