@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Summary — ExpenseIQ{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Summary & Analytics</h1>
+  <p class="page-subtitle">Monthly breakdowns and category analysis</p>
+</div>
+
+<div class="grid grid-2" style="margin-bottom:1.5rem;">
+
+  <!-- Monthly Breakdown -->
+  <div class="card">
+    <div class="card-title">Monthly Breakdown</div>
+    {% if monthly %}
+    <table class="table">
+      <thead>
+        <tr><th>Month</th><th>Expenses</th><th>Total</th></tr>
+      </thead>
+      <tbody>
+        {% for m in monthly %}
+        <tr>
+          <td>{{ m.month }}</td>
+          <td style="color:var(--muted);">{{ m.cnt }} records</td>
+          <td class="amount">₹{{ "%.2f"|format(m.total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center; padding:2rem; color:var(--muted);">No data yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- Category Analysis -->
+  <div class="card">
+    <div class="card-title">Category Analysis</div>
+    {% if by_category %}
+    <table class="table">
+      <thead>
+        <tr><th>Category</th><th>Count</th><th>Avg</th><th>Total</th></tr>
+      </thead>
+      <tbody>
+        {% for c in by_category %}
+        <tr>
+          <td><span class="badge" style="background:var(--surface2); color:var(--accent);">{{ c.name }}</span></td>
+          <td style="color:var(--muted);">{{ c.cnt }}</td>
+          <td style="color:var(--muted);">₹{{ "%.0f"|format(c.avg) }}</td>
+          <td class="amount">₹{{ "%.2f"|format(c.total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center; padding:2rem; color:var(--muted);">No data yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Category bar chart -->
+{% if by_category %}
+<div class="card">
+  <div class="card-title">Spending by Category</div>
+  <canvas id="barChart" height="100"></canvas>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const catData = {{ by_category | tojson if by_category else '[]' }};
+  if (catData.length) {
+    const COLORS = ['#7c6aff','#ff6a9b','#6affd4','#fbbf24','#60a5fa','#f472b6','#34d399'];
+    new Chart(document.getElementById('barChart'), {
+      type: 'bar',
+      data: {
+        labels: catData.map(d => d.name),
+        datasets: [{
+          label: 'Total Spent (₹)',
+          data: catData.map(d => d.total),
+          backgroundColor: COLORS,
+          borderRadius: 6,
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#6b6b88', font: { family: 'DM Mono', size: 11 } }, grid: { color: '#2a2a3a' } },
+          y: { ticks: { color: '#6b6b88', font: { family: 'DM Mono', size: 11 } }, grid: { color: '#2a2a3a' } }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}
