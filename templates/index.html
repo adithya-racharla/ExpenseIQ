@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ExpenseIQ{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Track, analyze, and manage your expenses</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('add-modal')">+ Add Expense</button>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-4" style="margin-bottom:1.5rem;">
+  <div class="card">
+    <div class="card-title">Total Spent</div>
+    <div class="stat-value accent-text">₹{{ "%.0f"|format(total) }}</div>
+    <div class="stat-label">All time</div>
+  </div>
+  <div class="card">
+    <div class="card-title">This Month</div>
+    <div class="stat-value accent2-text">₹{{ "%.0f"|format(this_month) }}</div>
+    <div class="stat-label">{{ now.strftime('%B %Y') if now else 'Current Month' }}</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Total Entries</div>
+    <div class="stat-value">{{ count }}</div>
+    <div class="stat-label">Expense records</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Top Category</div>
+    <div class="stat-value accent3-text" style="font-size:1.3rem;">{{ top_category.name if top_category else '—' }}</div>
+    <div class="stat-label">{% if top_category %}₹{{ "%.0f"|format(top_category.total) }} spent{% else %}No data yet{% endif %}</div>
+  </div>
+</div>
+
+<!-- Charts + Add Form -->
+<div class="grid grid-2" style="margin-bottom:1.5rem;">
+  <div class="card">
+    <div class="card-title">Monthly Trend</div>
+    <canvas id="trendChart" height="180"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">By Category</div>
+    <canvas id="categoryChart" height="180"></canvas>
+  </div>
+</div>
+
+<!-- Recent Expenses -->
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <div class="card-title" style="margin-bottom:0;">Recent Expenses</div>
+    <a href="{{ url_for('all_expenses') }}" class="btn btn-ghost" style="font-size:0.75rem;">View All →</a>
+  </div>
+  {% if recent %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in recent %}
+      <tr>
+        <td style="color:var(--muted);">{{ e.date }}</td>
+        <td><span class="badge" style="background:var(--surface2); color:var(--accent);">{{ e.category }}</span></td>
+        <td>{{ e.description }}</td>
+        <td class="amount">₹{{ "%.2f"|format(e.amount) }}</td>
+        <td>
+          <form method="POST" action="{{ url_for('delete_expense', expense_id=e.id) }}" onsubmit="return confirm('Delete this expense?')">
+            <button class="btn btn-danger" style="padding:0.3rem 0.7rem; font-size:0.72rem;">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center; padding:2rem; color:var(--muted);">
+    No expenses yet. Add your first one!
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add Expense Modal -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-title">Add New Expense</div>
+    <form method="POST" action="{{ url_for('add_expense') }}">
+      <div class="grid grid-2">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" name="date" class="form-control" value="{{ today }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount (₹)</label>
+          <input type="number" name="amount" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select name="category_id" class="form-control" required>
+          <option value="">Select category</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" name="description" class="form-control" placeholder="What did you spend on?" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('add-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Expense</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal-overlay" id="cat-modal">
+  <div class="modal">
+    <div class="modal-title">Add New Category</div>
+    <form method="POST" action="{{ url_for('add_category') }}">
+      <div class="form-group">
+        <label class="form-label">Category Name</label>
+        <input type="text" name="name" class="form-control" placeholder="e.g. Travel, Gym..." required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('cat-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Category</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function openModal(id) { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+  });
+
+  // Chart data from Flask
+  const trendData = {{ trend | tojson }};
+  const breakdownData = {{ breakdown | tojson }};
+
+  const COLORS = ['#7c6aff','#ff6a9b','#6affd4','#fbbf24','#60a5fa','#f472b6','#34d399'];
+
+  // Trend chart
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: trendData.map(d => d.month),
+      datasets: [{
+        label: 'Spending',
+        data: trendData.map(d => d.total),
+        borderColor: '#7c6aff',
+        backgroundColor: 'rgba(124,106,255,0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#7c6aff',
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#6b6b88', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#2a2a3a' } },
+        y: { ticks: { color: '#6b6b88', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#2a2a3a' } }
+      }
+    }
+  });
+
+  // Category doughnut
+  new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+      labels: breakdownData.map(d => d.name),
+      datasets: [{
+        data: breakdownData.map(d => d.total),
+        backgroundColor: COLORS,
+        borderWidth: 0,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '65%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { color: '#e8e8f0', font: { family: 'DM Mono', size: 10 }, padding: 12, boxWidth: 10 }
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}
