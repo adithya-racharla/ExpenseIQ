@@ -53,7 +53,7 @@
     <a href="{{ url_for('all_expenses') }}" class="btn btn-ghost" style="font-size:0.75rem;">View All →</a>
   </div>
   {% if recent %}
-  <table class="table">
+  <div class="table-wrapper"><table class="table">
     <thead>
       <tr>
         <th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Action</th>
@@ -74,7 +74,7 @@
       </tr>
       {% endfor %}
     </tbody>
-  </table>
+  </table></div>
   {% else %}
   <div style="text-align:center; padding:2rem; color:var(--muted);">
     No expenses yet. Add your first one!
